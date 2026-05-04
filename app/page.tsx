@@ -1,65 +1,103 @@
-import Image from "next/image";
+"use client";
+import { useState } from "react";
+import ResumeUploader from "@/components/ResumeUploader";
+import ScoreCard from "@/components/ScoreCard";
+import BulletRewriter from "@/components/BulletRewriter";
+import JDMatcher from "@/components/JDMatcher";
+import { AnalysisResult } from "@/lib/claude";
 
 export default function Home() {
+  const [resumeText, setResumeText] = useState("");
+  const [jobDescription, setJobDescription] = useState("");
+  const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleAnalyze = async () => {
+    if (!resumeText) return;
+    setIsLoading(true);
+    setError(null);
+    setResult(null);
+
+    try {
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resumeText, jobDescription }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Something went wrong");
+      setResult(data);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <main className="min-h-screen bg-gradient-to-br from-violet-50 to-indigo-50">
+      <div className="max-w-3xl mx-auto px-4 py-12 space-y-8">
+        {/* Header */}
+        <div className="text-center space-y-2">
+          <h1 className="text-4xl font-extrabold text-gray-900">
+            🎓 FresherFit
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="text-gray-500 text-lg">
+            AI-powered resume analyzer for students — beat ATS, land interviews
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        {/* Upload */}
+        <ResumeUploader onTextExtracted={setResumeText} isLoading={isLoading} />
+
+        {/* Job Description */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-2">
+          <label className="font-semibold text-gray-700">
+            📋 Job Description{" "}
+            <span className="text-gray-400 font-normal text-sm">(optional)</span>
+          </label>
+          <textarea
+            rows={5}
+            placeholder="Paste the job description here to get a match score and gap analysis..."
+            value={jobDescription}
+            onChange={(e) => setJobDescription(e.target.value)}
+            className="w-full border border-gray-200 rounded-xl p-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-violet-400 resize-none"
+          />
         </div>
-      </main>
-    </div>
+
+        {/* Analyze Button */}
+        <button
+          onClick={handleAnalyze}
+          disabled={!resumeText || isLoading}
+          className="w-full bg-violet-600 hover:bg-violet-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl transition-all text-lg shadow-md"
+        >
+          {isLoading ? "⏳ Analyzing your resume..." : "🚀 Analyze My Resume"}
+        </button>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-600 rounded-xl p-4 text-sm">
+            {error}
+          </div>
+        )}
+
+        {/* Results */}
+        {result && (
+          <div className="space-y-6 animate-fadeIn">
+            <ScoreCard
+              atsScore={result.atsScore}
+              jdMatchScore={result.jdMatchScore}
+              strengths={result.strengths}
+              weaknesses={result.weaknesses}
+            />
+            <BulletRewriter bullets={result.rewrittenBullets} />
+            <JDMatcher
+              missingKeywords={result.missingKeywords}
+              actionableFeedback={result.actionableFeedback}
+            />
+          </div>
+        )}
+      </div>
+    </main>
   );
 }
